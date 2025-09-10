@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Asset Integrated Analysis Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center backdrop-blur-sm" style="display: none;">
+        <div class="text-center">
+            <div class="loader inline-block mb-4"></div>
+            <p class="text-xl text-white">高度な分析を実行中...</p>
+        </div>
+    </div>
+
+    <header class="bg-gray-800 shadow-md sticky top-0 z-40">
+        <div class="ticker-container">
+            <div id="price-ticker-wrap" class="ticker-wrap"></div>
+        </div>
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Integrated Analysis Tool</h1>
+                <p class="text-sm text-gray-400">デイトレードダッシュボードと詳細分析エンジンを統合</p>
+            </div>
+            <button id="clear-data-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-300 text-sm">全データクリア</button>
+        </div>
+    </header>
+
+    <main id="main-content" class="container mx-auto p-4">
+        <section id="quick-price-view" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4 mb-8">
+            <!-- Quick price view will be populated here -->
+        </section>
+        
+        <section class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-lg mb-8 border border-gray-700">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                <div>
+                    <label for="timeframe-select" class="block text-sm font-medium text-gray-300 mb-1">分析時間足</label>
+                    <select id="timeframe-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"></select>
+                </div>
+                <div>
+                    <label for="analysis-mode-select" class="block text-sm font-medium text-gray-300 mb-1">分析モード</label>
+                    <select id="analysis-mode-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="high_accuracy">高精度安定型</option>
+                        <option value="scalping_max">スキャルピング特化型</option>
+                    </select>
+                </div>
+                <div class="flex flex-col md:flex-row items-center gap-4 md:mt-6">
+                    <button id="run-analysis-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-md transition duration-300 flex items-center justify-center">総合分析を実行</button>
+                    <div class="flex items-center">
+                        <input id="auto-refresh-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <label for="auto-refresh-checkbox" class="ml-2 block text-sm text-gray-300">自動更新</label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="dashboard-meters" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4 mb-8">
+            <!-- Dashboard meters will be populated here -->
+        </section>
+
+        <section class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-lg mb-8 border border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-4">シグナル正答率
+                <span class="tooltip text-sm text-gray-400" id="accuracy-tooltip-icon">
+                    &#9432;
+                    <span class="tooltiptext">シグナル発生から一定期間後の価格変動を元に、シグナルの方向性が正しかったかを検証した結果です。</span>
+                </span>
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <p class="text-4xl font-bold text-indigo-400" id="accuracy-rate">0.0%</p>
+                    <p class="text-sm text-gray-400">正答率</p>
+                </div>
+                <div>
+                    <p class="text-4xl font-bold text-white" id="verified-signals">0</p>
+                    <p class="text-sm text-gray-400">検証済みシグナル数</p>
+                </div>
+                <div>
+                    <p class="text-4xl font-bold text-green-400" id="success-signals">0</p>
+                    <p class="text-sm text-gray-400">成功シグナル数</p>
+                </div>
+                <div>
+                    <p class="text-4xl font-bold text-red-400" id="fail-signals">0</p>
+                    <p class="text-sm text-gray-400">失敗シグナル数</p>
+                </div>
+            </div>
+             <div class="text-center mt-4">
+                <button id="reset-accuracy-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-3 rounded">履歴をリセット</button>
+            </div>
+        </section>
+        
+        <section id="open-positions-section" class="mb-8 hidden">
+            <h2 class="text-2xl font-bold text-white mb-4">保有中のポジション</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-gray-300">
+                    <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                        <tr>
+                            <th class="p-2">銘柄</th><th class="p-2">売買</th><th class="p-2">参入価格</th>
+                            <th class="p-2">現在価格</th><th class="p-2">評価損益(PnL)</th><th class="p-2">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="open-positions-body" class="bg-gray-800"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <div>
+            <div class="border-b border-gray-700 mb-4">
+                <nav id="tabs" class="flex -mb-px space-x-6" aria-label="Tabs">
+                    <button class="tab active" data-target="tab-content-ranking">ランキング</button>
+                    <button class="tab" data-target="tab-content-all-pairs">全通貨ペア</button>
+                    <button class="tab" data-target="tab-content-trade-history">取引履歴</button>
+                </nav>
+            </div>
+            <div id="tab-content-container">
+                <div id="tab-content-ranking" class="tab-content"></div>
+                <div id="tab-content-all-pairs" class="tab-content hidden"></div>
+                <div id="tab-content-trade-history" class="tab-content hidden">
+                    <div class="overflow-x-auto">
+                         <table class="w-full text-sm text-left text-gray-300">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                                <tr>
+                                    <th class="p-2">参入日時</th><th class="p-2">銘柄</th><th class="p-2">売買</th>
+                                    <th class="p-2">参入価格</th><th class="p-2">決済価格</th><th class="p-2">損益(PnL)</th>
+                                    <th class="p-2">決済理由</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trade-history-body" class="bg-gray-800"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Trade Entry Modal -->
+    <div id="trade-entry-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">トレード執行</h2>
+                <button id="trade-modal-close-btn" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <form id="trade-form">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div><label class="block mb-1">銘柄</label><input type="text" id="modal-pair" class="w-full bg-gray-700 p-2 rounded" readonly></div>
+                    <div><label class="block mb-1">売買</label><input type="text" id="modal-signal" class="w-full bg-gray-700 p-2 rounded" readonly></div>
+                </div>
+                <div class="mb-4"><label class="block mb-1">参入価格</label><input type="text" id="modal-price" class="w-full bg-gray-700 p-2 rounded" readonly></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     <div><label class="block mb-1">損切り(SL)</label><input type="number" step="any" id="modal-stop-loss" class="w-full bg-gray-700 p-2 rounded"></div>
+                     <div><label class="block mb-1">利食い(TP)</label><input type="number" step="any" id="modal-take-profit" class="w-full bg-gray-700 p-2 rounded"></div>
+                </div>
+                <div class="mb-4"><label class="block mb-1">ロット数</label><input type="number" step="0.01" id="modal-lot" class="w-full bg-gray-700 p-2 rounded" value="1.0"></div>
+                <button id="confirm-trade-btn" type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">執行確認</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Chart Modal -->
+    <div id="chart-modal" class="modal-backdrop hidden">
+        <div class="modal-content" style="max-width: 80vw;">
+             <div class="flex justify-between items-center mb-4">
+                <h2 id="chart-title" class="text-2xl font-bold text-white">チャート分析</h2>
+                <button id="chart-modal-close-btn" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div id="timeframe-buttons" class="mb-4 flex space-x-2"></div>
+            <div class="h-96"><canvas id="chart-canvas"></canvas></div>
+        </div>
+    </div>
+    
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
